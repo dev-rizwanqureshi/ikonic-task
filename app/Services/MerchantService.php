@@ -21,6 +21,49 @@ class MerchantService
     public function register(array $data): Merchant
     {
         // TODO: Complete this method
+
+        $user = User::create(
+            [
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => $data['api_key'],
+                'type' => User::TYPE_MERCHANT,
+            ]
+        );
+
+        $user->merchant()->create(
+            [
+                'domain' => $data['domain'],
+                'display_name' => $data['name'],
+                'turn_customers_into_affiliates' => isset($data['turn_customers_into_affiliates']) ? $data['turn_customers_into_affiliates'] : true,
+                'default_commission_rate' => isset($data['default_commission_rate']) ? $data['default_commission_rate'] : 0.1,
+            ]
+        );
+
+
+//        comments will be remove after testing
+
+//        $merchant = new Merchant();
+//        $merchant->user_id = $user->id;
+//        $merchant->domain = $data['domain'];
+//        $merchant->display_name = $data['name'];
+//        $merchant->turn_customers_into_affiliates = isset($data['turn_customers_into_affiliates']) ? $data['turn_customers_into_affiliates'] : true;
+//        $merchant->default_commission_rate = isset($data['default_commission_rate']) ? $data['default_commission_rate'] : 0.1;
+//        $merchant->save();
+
+
+//        $merchant = new Merchant([
+//            'domain' => $data['domain'],
+//            'display_name' => $data['name'],
+//            'turn_customers_into_affiliates' => true,
+//            'default_commission_rate' => 0.1,
+//        ]);
+//
+//        $user->merchant()->save($merchant);
+
+
+        return $user->merchant();
+
     }
 
     /**
@@ -32,6 +75,21 @@ class MerchantService
     public function updateMerchant(User $user, array $data)
     {
         // TODO: Complete this method
+
+        $user->name = $data['name'];
+        $user->email = $data['email'];
+        $user->password = $data['api_key'];
+        $user->save();
+
+        $user->merchant()->update(
+            [
+                'domain' => $data['domain'],
+                'display_name' => $data['name'],
+                'turn_customers_into_affiliates' => $data['turn_customers_into_affiliates'],
+                'default_commission_rate' => $data['default_commission_rate'],
+            ]
+        );
+
     }
 
     /**
@@ -44,6 +102,9 @@ class MerchantService
     public function findMerchantByEmail(string $email): ?Merchant
     {
         // TODO: Complete this method
+
+        $user = User::with('merchant')->where('email', $email)->first();
+        return $user->merchant();
     }
 
     /**
@@ -56,5 +117,12 @@ class MerchantService
     public function payout(Affiliate $affiliate)
     {
         // TODO: Complete this method
+
+        $orders = Order::with('merchant', 'affiliate.user:id,name,email')->where('affiliate_id', $affiliate->id)->where('payout_status', Order::STATUS_UNPAID)->orderBy('id')->get();
+        if($orders->isNotEmpty()) {
+            foreach ($orders as $order) {
+                new PayoutOrderJob($order);
+            }
+        }
     }
 }
